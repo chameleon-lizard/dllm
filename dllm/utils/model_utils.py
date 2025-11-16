@@ -31,7 +31,7 @@ def get_model(
     # Device map: skip when ZeRO-3
     device_map = (
         {"": accelerate.PartialState().local_process_index}
-        if not transformers.modeling_utils.is_deepspeed_zero3_enabled()
+        if not transformers.modeling_utils.is_deepspeed_zero3_enabled() and torch.cuda.is_available()
         else None
     )
 
