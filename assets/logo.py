@@ -2,21 +2,21 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import os
 
-# ---------- 配置（更小体积） ----------
-W, H = 480, 210  # 降低分辨率
+# ---------- Configuration (smaller size) ----------
+W, H = 480, 210  # lower resolution
 TOTAL_DURATION = 3.0
-FPS = 15  # 降低帧率
+FPS = 15  # lower fps
 TEXT = "dLLM"
 # TEXT_COLOR = (235, 235, 235)
 TEXT_COLOR = (0, 0, 0)
 OUTPUT = "logo.gif"
 LAST_FRAME_PNG = "logo.png"
 
-DIFFUSION_PORTION = 0.3  # 扩散帧更少
+DIFFUSION_PORTION = 0.3  # fewer diffusion frames
 SEED = 8
 
 
-# ---------- 自动字号 ----------
+# ---------- Auto font size ----------
 def load_font_auto_size(text, w, h, target_width_ratio=0.95, target_height_ratio=0.95):
     lo, hi = 10, 2000
     best_font, best_size = None, lo
@@ -45,7 +45,7 @@ def load_font_auto_size(text, w, h, target_width_ratio=0.95, target_height_ratio
     return best_font if best_font is not None else font
 
 
-# ---------- 文本渲染 ----------
+# ---------- Text rendering ----------
 def render_text_mask(w, h, text, font):
     img = Image.new("L", (w, h), 0)
     d = ImageDraw.Draw(img)
@@ -57,7 +57,7 @@ def render_text_mask(w, h, text, font):
     return np.asarray(img, np.float32) / 255.0
 
 
-# ---------- 初始化 ----------
+# ---------- Initialization ----------
 font = load_font_auto_size(TEXT, W, H)
 mask = render_text_mask(W, H, TEXT, font)
 
@@ -68,7 +68,7 @@ hold_ms = int((TOTAL_DURATION - diffusion_frames / FPS) * 1000)
 rng = np.random.default_rng(SEED)
 frames = []
 
-# ---------- 扩散阶段 ----------
+# ---------- Diffusion stage ----------
 for i in range(diffusion_frames):
     t = i / max(1, diffusion_frames - 1)
     progress = t**0.9
@@ -89,18 +89,18 @@ for i in range(diffusion_frames):
     frame = (np.clip(frame, 0.0, 1.0) * 255).astype(np.uint8)
     frames.append(Image.fromarray(frame, mode="RGB"))
 
-# ---------- 最后一帧 ----------
+# ---------- Last frame ----------
 final_frame = frames[-1]
 
-# ---------- 保存最后一帧为 PNG ----------
+# ---------- Save last frame as PNG ----------
 final_frame.save(LAST_FRAME_PNG)
 print(f"🖼️  Last frame saved as: {LAST_FRAME_PNG}")
 
-# ---------- 量化（减少体积） ----------
+# ---------- Quantization (reduce size) ----------
 pal_frames = [f.convert("P", palette=Image.ADAPTIVE, colors=64) for f in frames]
 pal_final = final_frame.convert("P", palette=Image.ADAPTIVE, colors=64)
 
-# ---------- 保存 GIF ----------
+# ---------- Save GIF ----------
 normal_ms = int(1000 / FPS)
 durations = [normal_ms] * len(pal_frames) + [hold_ms]
 

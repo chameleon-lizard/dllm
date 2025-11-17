@@ -43,7 +43,7 @@ class MDLMTrainer(transformers.Trainer):
         """Compute loss weights given timestep t and other arguments."""
         b, l = inputs["input_ids"].shape
         if self.loss_weight_type == "scheduler":
-            loss_weights = -self.scheduler.weight(t).unsqueeze(1).repeat(1, l)  # b, 1
+            loss_weights = self.scheduler.weight(t).unsqueeze(1).repeat(1, l)  # b, 1
         elif self.loss_weight_type == "ones":
             loss_weights = torch.ones_like(inputs["input_ids"])
         else:
