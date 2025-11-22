@@ -97,6 +97,12 @@ def train():
                 num_proc=data_args.num_proc,
                 desc="Mapping dataset to SFT format",
             )
+            # Filter out invalid rows (e.g., conversations with insufficient turns)
+            dataset = dataset.filter(
+                dllm.utils.filter_invalid_sft_rows,
+                num_proc=data_args.num_proc,
+                desc="Filtering invalid SFT rows",
+            )
         # truncate / filter long sequences if needed
         dataset = dllm.utils.post_process_dataset(dataset, data_args)
 

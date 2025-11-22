@@ -53,6 +53,12 @@ def preprocess_sft_dataset(
         writer_batch_size=512,
         desc="offline preprocessing",
     )
+    # Filter out invalid rows (e.g., conversations with insufficient turns)
+    processed = processed.filter(
+        dllm.utils.filter_invalid_sft_rows,
+        num_proc=num_proc,
+        desc="Filtering invalid SFT rows",
+    )
 
     # Keep only the three required columns to save space.
     if remove_columns:

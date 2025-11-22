@@ -191,7 +191,7 @@ class NoAttentionMaskCollator(transformers.DataCollatorForSeq2Seq):
         return outputs
 
 
-def default_sft_map_fn(row, *, tokenizer, mask_prompt_loss: bool = True) -> dict:
+def default_sft_map_fn(row, *, tokenizer, mask_prompt_loss: bool = True) -> dict | None:
     """
     Build input_ids and labels for SFT.
 
@@ -201,16 +201,28 @@ def default_sft_map_fn(row, *, tokenizer, mask_prompt_loss: bool = True) -> dict
         mask_prompt_loss: whether to mask prompt tokens (set their labels to -100)
 
     Returns:
-        dict with keys: input_ids, labels, and optionally prompt_len
+        dict with keys: input_ids, labels, and optionally prompt_len.
+        Returns None for invalid rows (missing/empty messages or insufficient turns).
     """
+    messages = row.get("messages")
+
+    # Validate messages format
+    if not messages:
+        return None
+
+    # When masking prompt loss, we need at least 2 messages (prompt + response)
+    # because we call apply_chat_template on messages[:-1]
+    if mask_prompt_loss and len(messages) < 2:
+        return None
+
     prompt_response_tokens = tokenizer.apply_chat_template(
-        row["messages"], tokenize=True, add_generation_prompt=False
+        messages, tokenize=True, add_generation_prompt=False
     )
     labels = prompt_response_tokens.copy()
 
     if mask_prompt_loss:
         prompt_tokens = tokenizer.apply_chat_template(
-            row["messages"][:-1], tokenize=True, add_generation_prompt=True
+            messages[:-1], tokenize=True, add_generation_prompt=True
         )
         labels[: len(prompt_tokens)] = [-100] * len(prompt_tokens)
         return {
@@ -220,3 +232,8 @@ def default_sft_map_fn(row, *, tokenizer, mask_prompt_loss: bool = True) -> dict
         }
 
     return {"input_ids": prompt_response_tokens, "labels": labels}
+
+
+def filter_invalid_sft_rows(row) -> bool:
+    """Filter out rows where default_sft_map_fn returned None (invalid conversations)."""
+    return row.get("input_ids") is not None
