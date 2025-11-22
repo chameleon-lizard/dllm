@@ -30,6 +30,7 @@ import os
 from dataclasses import dataclass, field
 from functools import partial
 
+import datasets
 import transformers
 import accelerate
 
@@ -51,6 +52,10 @@ class DataArguments(dllm.utils.DataArguments):
     mask_prompt_loss: bool = field(
         default=True,
         metadata={"help": "Whether to mask the loss on the prompt tokens"},
+    )
+    balance_datasets: bool = field(
+        default=False,
+        metadata={"help": "Balance datasets by truncating to shortest dataset size"},
     )
 
 
@@ -82,10 +87,55 @@ def train():
 
     # ----- Dataset ----------------------------------------------------------------
     with accelerate.PartialState().local_main_process_first():
-        dataset = dllm.data.load_sft_dataset(
-            data_args.dataset_args,
-            load_preprocessed_data=data_args.load_preprocessed_data,
-        )
+        # Parse dataset specs (pipe-separated)
+        specs = [s.strip() for s in data_args.dataset_args.split("|") if s.strip()]
+
+        if data_args.balance_datasets and len(specs) > 1:
+            # Load each dataset separately to balance them
+            all_datasets = []
+            for spec in specs:
+                ds = dllm.data.load_sft_dataset(
+                    spec, load_preprocessed_data=data_args.load_preprocessed_data
+                )
+                all_datasets.append(ds)
+
+            # Find minimum train size across all datasets
+            min_train_size = min(len(ds["train"]) for ds in all_datasets)
+            logger.info(
+                f"Balancing {len(specs)} datasets to min train size: {min_train_size}"
+            )
+
+            # Truncate each dataset to min size and merge
+            balanced_parts = []
+            for ds in all_datasets:
+                balanced_ds = datasets.DatasetDict(
+                    {
+                        split: (
+                            ds[split].select(range(min(len(ds[split]), min_train_size)))
+                            if split == "train"
+                            else ds[split]
+                        )
+                        for split in ds.keys()
+                    }
+                )
+                balanced_parts.append(balanced_ds)
+
+            # Concatenate balanced datasets
+            merged_splits = {}
+            all_splits = set()
+            for ds in balanced_parts:
+                all_splits.update(ds.keys())
+            for split in all_splits:
+                split_datasets = [ds[split] for ds in balanced_parts if split in ds]
+                merged_splits[split] = datasets.concatenate_datasets(split_datasets)
+            dataset = datasets.DatasetDict(merged_splits)
+        else:
+            # Standard loading (single dataset or no balancing)
+            dataset = dllm.data.load_sft_dataset(
+                data_args.dataset_args,
+                load_preprocessed_data=data_args.load_preprocessed_data,
+            )
+
         if not data_args.load_preprocessed_data:
             map_fn = partial(
                 dllm.utils.default_sft_map_fn,
