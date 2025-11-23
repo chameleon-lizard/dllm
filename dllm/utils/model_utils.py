@@ -91,6 +91,7 @@ def get_tokenizer(model_args) -> transformers.PreTrainedTokenizer:
         BertPreTrainedModel,
         RobertaPreTrainedModel,
         ModernBertPreTrainedModel,
+        T5PreTrainedModel,
     )
 
     model_name_or_path = getattr(model_args, "model_name_or_path")
@@ -145,7 +146,7 @@ def get_tokenizer(model_args) -> transformers.PreTrainedTokenizer:
         tokenizer.add_special_tokens({"mask_token": "<|mask|>"})
     elif issubclass(
         model_cls,
-        (BertPreTrainedModel, RobertaPreTrainedModel, ModernBertPreTrainedModel),
+        (BertPreTrainedModel, RobertaPreTrainedModel, ModernBertPreTrainedModel, T5PreTrainedModel),
     ):
         tokenizer.eot_token = "[/Answer]"
         tokenizer.chat_template = """\
